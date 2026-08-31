@@ -1,0 +1,148 @@
+#!/usr/bin/env python3
+"""Generate the LiteLLM config from Home Assistant options and start it."""
+
+import json
+import os
+from pathlib import Path
+import sys
+import tempfile
+
+import yaml
+
+
+DATA_DIR = Path("/data")
+OPTIONS_PATH = DATA_DIR / "options.json"
+CONFIG_PATH = DATA_DIR / "litellm-config.yaml"
+CHATGPT_GRACE_PATH = DATA_DIR / ".chatgpt-startup-grace"
+PORT = 4000
+RESERVED_ENVIRONMENT_VARIABLES = {
+    "CHATGPT_AUTH_FILE",
+    "CHATGPT_TOKEN_DIR",
+    "CONFIG_FILE_PATH",
+    "HOME",
+    "LITELLM_LOG",
+    "LITELLM_MASTER_KEY",
+    "LITELLM_MODE",
+    "LITELLM_SALT_KEY",
+    "XDG_CACHE_HOME",
+}
+
+
+def fail(message: str) -> None:
+    print(f"Configuration error: {message}", file=sys.stderr)
+    raise SystemExit(1)
+
+
+def load_options() -> dict:
+    try:
+        options = json.loads(OPTIONS_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        fail(f"cannot read {OPTIONS_PATH}: {error}")
+    if not isinstance(options, dict):
+        fail("options.json must contain an object")
+    return options
+
+
+def build_config(options: dict) -> dict:
+    master_key = options.get("master_key")
+    if not isinstance(master_key, str) or not master_key:
+        fail("master_key is required")
+    if not master_key.startswith("sk-") or len(master_key) < 19:
+        fail("master_key must start with 'sk-' and contain at least 16 more characters")
+
+    raw_config = options.get("litellm_config", "")
+    if not isinstance(raw_config, str):
+        fail("litellm_config must be YAML text")
+    try:
+        config = yaml.safe_load(raw_config) if raw_config.strip() else {}
+    except yaml.YAMLError as error:
+        mark = getattr(error, "problem_mark", None)
+        location = f" near line {mark.line + 1}, column {mark.column + 1}" if mark else ""
+        fail(f"litellm_config is not valid YAML{location}")
+    if not isinstance(config, dict):
+        fail("litellm_config must contain a YAML mapping")
+
+    general_settings = config.setdefault("general_settings", {})
+    if not isinstance(general_settings, dict):
+        fail("general_settings must be a YAML mapping")
+    general_settings["master_key"] = "os.environ/LITELLM_MASTER_KEY"
+
+    environment_variables = config.get("environment_variables", {})
+    if not isinstance(environment_variables, dict):
+        fail("environment_variables must be a YAML mapping")
+    if RESERVED_ENVIRONMENT_VARIABLES.intersection(environment_variables):
+        fail("environment_variables contains a setting managed by the add-on")
+
+    os.environ["LITELLM_MASTER_KEY"] = master_key
+    log_level = options.get("log_level", "info")
+    if log_level not in {"debug", "info", "warning", "error", "critical"}:
+        fail("log_level is invalid")
+    os.environ["LITELLM_LOG"] = log_level.upper()
+
+    salt_key = options.get("salt_key", "")
+    if salt_key:
+        if not isinstance(salt_key, str):
+            fail("salt_key must be a string")
+        os.environ["LITELLM_SALT_KEY"] = salt_key
+
+    return config
+
+
+def write_config(config: dict) -> None:
+    DATA_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+    (DATA_DIR / "chatgpt").mkdir(mode=0o700, exist_ok=True)
+    (DATA_DIR / ".cache").mkdir(mode=0o700, exist_ok=True)
+
+    descriptor, temporary_name = tempfile.mkstemp(
+        dir=DATA_DIR, prefix=".litellm-config-", text=True
+    )
+    try:
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as temporary_file:
+            yaml.safe_dump(config, temporary_file, sort_keys=False)
+            temporary_file.flush()
+            os.fsync(temporary_file.fileno())
+        os.replace(temporary_name, CONFIG_PATH)
+    except BaseException:
+        Path(temporary_name).unlink(missing_ok=True)
+        raise
+
+
+def prepare_chatgpt_health_grace(config: dict) -> None:
+    model_list = config.get("model_list", [])
+    uses_chatgpt = any(
+        isinstance(model, dict)
+        and isinstance(model.get("litellm_params"), dict)
+        and str(model["litellm_params"].get("model", "")).startswith("chatgpt/")
+        for model in model_list
+    ) if isinstance(model_list, list) else False
+
+    if uses_chatgpt:
+        CHATGPT_GRACE_PATH.touch(mode=0o600)
+    else:
+        CHATGPT_GRACE_PATH.unlink(missing_ok=True)
+
+
+def main() -> None:
+    # LiteLLM creates OAuth token files after startup; keep them owner-only.
+    os.umask(0o077)
+    config = build_config(load_options())
+    write_config(config)
+    prepare_chatgpt_health_grace(config)
+    os.environ["CHATGPT_TOKEN_DIR"] = str(DATA_DIR / "chatgpt")
+    os.environ["CHATGPT_AUTH_FILE"] = "auth.json"
+    print(f"Starting LiteLLM on port {PORT}")
+    arguments = [
+        "litellm",
+        "--config",
+        str(CONFIG_PATH),
+        "--port",
+        str(PORT),
+        "--num_workers",
+        "1",
+    ]
+    os.execvpe(arguments[0], arguments, os.environ)
+
+
+if __name__ == "__main__":
+    main()

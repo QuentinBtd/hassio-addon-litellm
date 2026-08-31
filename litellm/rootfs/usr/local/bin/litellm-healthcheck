@@ -1,0 +1,21 @@
+#!/usr/bin/env python3
+"""Check LiteLLM liveness, allowing its bounded initial OAuth device flow."""
+
+from pathlib import Path
+import time
+from urllib.error import URLError
+from urllib.request import urlopen
+
+
+GRACE_PATH = Path("/data/.chatgpt-startup-grace")
+AUTH_WINDOW_SECONDS = 16 * 60
+
+
+try:
+    with urlopen("http://127.0.0.1:4000/health/liveliness", timeout=4) as response:
+        if response.status != 200:
+            raise SystemExit(1)
+except (OSError, TimeoutError, URLError):
+    grace_age = time.time() - GRACE_PATH.stat().st_mtime if GRACE_PATH.exists() else None
+    if grace_age is None or grace_age > AUTH_WINDOW_SECONDS:
+        raise SystemExit(1)

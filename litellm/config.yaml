@@ -1,0 +1,34 @@
+name: LiteLLM
+version: "1.0.0"
+slug: litellm
+description: OpenAI-compatible gateway for ChatGPT OAuth and other LLM providers
+url: https://github.com/QuentinBtd/hassio-addon-litellm/tree/main/litellm
+arch:
+  - amd64
+  - aarch64
+image: ghcr.io/quentinbtd/hassio-addon-litellm
+startup: application
+boot: auto
+stage: stable
+init: false
+backup: cold
+ports:
+  4000/tcp: 4000
+ports_description:
+  4000/tcp: LiteLLM API
+options:
+  master_key: null
+  salt_key: ""
+  log_level: info
+  litellm_config: |-
+    model_list:
+      - model_name: chatgpt/gpt-5.4
+        model_info:
+          mode: responses
+        litellm_params:
+          model: chatgpt/gpt-5.4
+schema:
+  master_key: password
+  salt_key: password
+  log_level: list(debug|info|warning|error|critical)
+  litellm_config: str

@@ -1,0 +1,3 @@
+# Home Assistant deprecated build.yaml in 2026. Builds are defined by the
+# Dockerfile and GitHub workflow; this empty map is retained for compatibility.
+{}
