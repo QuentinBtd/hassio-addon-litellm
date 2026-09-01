@@ -66,7 +66,7 @@ jobs:
               print(f"image=ghcr.io/{os.environ['GITHUB_REPOSITORY'].lower()}", file=output)
         env:
           INPUT_VERSION: ${{ inputs.version }}
-          PUBLISH: ${{ inputs.publish }}
+          PUBLISH: ${{ inputs.publish == true }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
@@ -75,7 +75,7 @@ jobs:
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
       - name: Log in to GHCR
-        if: inputs.publish
+        if: inputs.publish == true
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
@@ -87,7 +87,7 @@ jobs:
         with:
           context: ./litellm
           platforms: linux/amd64,linux/arm64
-          push: ${{ inputs.publish }}
+          push: ${{ inputs.publish == true }}
           tags: |
             ${{ steps.addon.outputs.image }}:${{ steps.addon.outputs.version }}
           build-args: |
@@ -98,7 +98,7 @@ jobs:
           sbom: true
 
       - name: Publish draft GitHub release
-        if: inputs.publish
+        if: inputs.publish == true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node .github/scripts/publish-github-release.mjs "${{ steps.addon.outputs.version }}"
