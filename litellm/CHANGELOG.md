@@ -1,3 +1,9 @@
+## [1.1.2](https://github.com/QuentinBtd/hassio-addon-litellm/compare/v1.1.1...v1.1.2) (2026-09-01)
+
+### Bug Fixes
+
+* restore ChatGPT non-streaming support ([a1d2e11](https://github.com/QuentinBtd/hassio-addon-litellm/commit/a1d2e11a87b04c2bf1a695973f53ae342313eb26))
+
 ## [1.1.1](https://github.com/QuentinBtd/hassio-addon-litellm/compare/v1.1.0...v1.1.1) (2026-09-01)
 
 ### Bug Fixes
