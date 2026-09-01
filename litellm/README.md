@@ -9,7 +9,8 @@ HA Assist -> native LiteLLM integration -> LiteLLM add-on -> providers
 The add-on uses LiteLLM's official stable container image and adds only Home
 Assistant option handling, persistent state paths, and health monitoring. It
 supports any provider LiteLLM supports, including ChatGPT subscription OAuth,
-OpenAI API, Anthropic, Gemini, Ollama, and OpenAI-compatible endpoints.
+GitHub Copilot OAuth, OpenAI API, Anthropic, Gemini, Ollama, and
+OpenAI-compatible endpoints.
 
 ## Installation
 
@@ -141,6 +142,47 @@ the endpoint used by Home Assistant. Not every Codex or Pro model supports that
 bridge. See the current [LiteLLM ChatGPT provider documentation](https://docs.litellm.ai/docs/providers/chatgpt)
 before changing models.
 
+## GitHub Copilot OAuth
+
+LiteLLM `v1.89.5`, pinned by this add-on, includes the `github_copilot/*`
+provider. It uses GitHub's OAuth device flow and requires a GitHub account with
+Copilot access. Add a chat-compatible Copilot model to `litellm_config`; for
+example, this configuration keeps the default ChatGPT model and adds Copilot:
+
+```yaml
+model_list:
+  - model_name: chatgpt/gpt-5.4
+    model_info:
+      mode: responses
+    litellm_params:
+      model: chatgpt/gpt-5.4
+  - model_name: github_copilot/gpt-5.2
+    litellm_params:
+      model: github_copilot/gpt-5.2
+```
+
+After saving the configuration and restarting the add-on:
+
+1. Send a request to `github_copilot/gpt-5.2`, or select it from a Home
+   Assistant conversation agent and send a message.
+2. Watch the add-on log for the GitHub verification URL and device code.
+3. Open the URL, enter the code, and authorize LiteLLM promptly while the
+   original request is waiting.
+4. Retry the request if it timed out during enrollment.
+
+LiteLLM stores the long-lived GitHub access token in
+`/data/.config/litellm/github_copilot/access-token` and its short-lived Copilot
+API key in `/data/.config/litellm/github_copilot/api-key.json`. Both survive
+restarts, upgrades, and Home Assistant backups. Treat them as secrets. LiteLLM
+refreshes the Copilot API key automatically from the persisted GitHub token.
+
+GitHub Enterprise users can set `GITHUB_COPILOT_API_BASE`,
+`GITHUB_COPILOT_DEVICE_CODE_URL`, `GITHUB_COPILOT_ACCESS_TOKEN_URL`, and
+`GITHUB_COPILOT_API_KEY_URL` in the LiteLLM `environment_variables` section.
+See the [LiteLLM GitHub Copilot provider documentation](https://docs.litellm.ai/docs/providers/github_copilot)
+for endpoint details and other supported models. Models whose metadata mode is
+`responses` only are not suitable for Home Assistant's chat-completions client.
+
 ## Persistence And Backups
 
 All add-on-owned runtime state is under `/data`:
@@ -150,6 +192,7 @@ All add-on-owned runtime state is under `/data`:
 | `/data/options.json` | Home Assistant-managed options and secrets |
 | `/data/litellm-config.yaml` | Generated effective LiteLLM configuration |
 | `/data/chatgpt/auth.json` | ChatGPT OAuth credentials |
+| `/data/.config/litellm/github_copilot/` | GitHub Copilot OAuth credentials and API key cache |
 | `/data/.cache` | Runtime caches |
 
 The add-on requests cold backups so mutable credentials and any database files
@@ -194,6 +237,9 @@ the image succeeds.
 - **ChatGPT authorization repeats after an upgrade:** verify the log does not
   report a permissions error for `/data/chatgpt/auth.json`; do not manually
   move the token outside `/data`.
+- **GitHub Copilot authorization repeats:** verify the log does not report a
+  permissions error under `/data/.config/litellm/github_copilot`; confirm the
+  GitHub account still has Copilot access.
 - **Health checks fail:** `/health/liveliness` does not call providers or spend
   tokens. Check startup errors rather than testing `/health`, which performs
   real model calls and can incur provider charges.
