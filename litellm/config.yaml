@@ -1,5 +1,5 @@
 name: LiteLLM
-version: "1.2.0"
+version: "1.2.1"
 slug: litellm
 description: OpenAI-compatible gateway for ChatGPT, GitHub Copilot, and other LLM providers
 url: https://github.com/QuentinBtd/hassio-addon-litellm/tree/main/litellm

@@ -1,3 +1,9 @@
+## [1.2.1](https://github.com/QuentinBtd/hassio-addon-litellm/compare/v1.2.0...v1.2.1) (2026-09-01)
+
+### Bug Fixes
+
+* discover available Copilot models ([15dc37e](https://github.com/QuentinBtd/hassio-addon-litellm/commit/15dc37e5ac90c98805feb2d2156b549f6f875dc2))
+
 ## [1.2.0](https://github.com/QuentinBtd/hassio-addon-litellm/compare/v1.1.2...v1.2.0) (2026-09-01)
 
 ### Features
