@@ -1,3 +1,9 @@
+## [1.2.0](https://github.com/QuentinBtd/hassio-addon-litellm/compare/v1.1.2...v1.2.0) (2026-09-01)
+
+### Features
+
+* enable GitHub Copilot OAuth ([5ee9d12](https://github.com/QuentinBtd/hassio-addon-litellm/commit/5ee9d1212d3eacaefcbc651d7241bb0dd518c9e1))
+
 ## [1.1.2](https://github.com/QuentinBtd/hassio-addon-litellm/compare/v1.1.1...v1.1.2) (2026-09-01)
 
 ### Bug Fixes
