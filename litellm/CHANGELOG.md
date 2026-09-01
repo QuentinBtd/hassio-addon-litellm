@@ -1,3 +1,9 @@
+## [1.1.1](https://github.com/QuentinBtd/hassio-addon-litellm/compare/v1.1.0...v1.1.1) (2026-09-01)
+
+### Bug Fixes
+
+* normalize workflow publish input ([f567e3f](https://github.com/QuentinBtd/hassio-addon-litellm/commit/f567e3fafb082d0393d2940871150ab84f70a580))
+
 ## [1.1.0](https://github.com/QuentinBtd/hassio-addon-litellm/compare/v1.0.0...v1.1.0) (2026-09-01)
 
 ### Features
