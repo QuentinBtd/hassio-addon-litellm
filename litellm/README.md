@@ -158,15 +158,26 @@ be backed up separately.
 
 ## Upgrades
 
-The add-on version controls the GHCR image tag. Release workflows are the only
-workflows allowed to publish. Each image is built from a
+The add-on version controls the GHCR image tag. Releases are automated with
+[semantic-release](https://github.com/semantic-release/semantic-release) from
+Conventional Commits on `main`. semantic-release updates `config.yaml` and
+`CHANGELOG.md`, builds and publishes the versioned multi-architecture image,
+and publishes the GitHub Release only after the image succeeds. The release is
+kept as a draft while the image builds, so a failed image build never exposes
+an unusable release. Each image is built from a
 specific LiteLLM stable tag and multi-architecture image digest; rolling
 `latest` and `main-latest` tags are never used. Review `CHANGELOG.md`, back up
 Home Assistant, and then update normally from the app/add-on store.
 
 LiteLLM is pinned in `Dockerfile`. Dependabot can propose Docker digest/tag
 updates, which should be tested before increasing the add-on version in
-`config.yaml` and publishing a release.
+`config.yaml` and publishing a release. Version changes are normally made by
+semantic-release rather than edited manually: `fix:` creates a patch release,
+`feat:` creates a minor release, and a `BREAKING CHANGE:` footer creates a
+major release. A failed image publication can be retried by manually running
+the Build workflow on the release tag with `publish` enabled and the matching
+version supplied; that workflow also publishes the pending draft release after
+the image succeeds.
 
 ## Troubleshooting
 
