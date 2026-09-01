@@ -27,6 +27,9 @@ options:
           mode: responses
         litellm_params:
           model: chatgpt/gpt-5.4
+      - model_name: github_copilot/gpt-5.2
+        litellm_params:
+          model: github_copilot/gpt-5.2
 schema:
   master_key: password
   salt_key: password

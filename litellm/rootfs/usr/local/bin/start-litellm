@@ -19,6 +19,9 @@ RESERVED_ENVIRONMENT_VARIABLES = {
     "CHATGPT_AUTH_FILE",
     "CHATGPT_TOKEN_DIR",
     "CONFIG_FILE_PATH",
+    "GITHUB_COPILOT_ACCESS_TOKEN_FILE",
+    "GITHUB_COPILOT_API_KEY_FILE",
+    "GITHUB_COPILOT_TOKEN_DIR",
     "HOME",
     "LITELLM_LOG",
     "LITELLM_MASTER_KEY",
@@ -91,6 +94,9 @@ def build_config(options: dict) -> dict:
 def write_config(config: dict) -> None:
     DATA_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
     (DATA_DIR / "chatgpt").mkdir(mode=0o700, exist_ok=True)
+    (DATA_DIR / ".config" / "litellm" / "github_copilot").mkdir(
+        mode=0o700, parents=True, exist_ok=True
+    )
     (DATA_DIR / ".cache").mkdir(mode=0o700, exist_ok=True)
 
     descriptor, temporary_name = tempfile.mkstemp(
@@ -131,6 +137,11 @@ def main() -> None:
     prepare_chatgpt_health_grace(config)
     os.environ["CHATGPT_TOKEN_DIR"] = str(DATA_DIR / "chatgpt")
     os.environ["CHATGPT_AUTH_FILE"] = "auth.json"
+    os.environ["GITHUB_COPILOT_TOKEN_DIR"] = str(
+        DATA_DIR / ".config" / "litellm" / "github_copilot"
+    )
+    os.environ["GITHUB_COPILOT_ACCESS_TOKEN_FILE"] = "access-token"
+    os.environ["GITHUB_COPILOT_API_KEY_FILE"] = "api-key.json"
     print(f"Starting LiteLLM on port {PORT}")
     arguments = [
         "litellm",

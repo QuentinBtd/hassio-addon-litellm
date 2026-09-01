@@ -35,8 +35,9 @@ LiteLLM configuration.
 | `log_level` | Yes | `debug`, `info`, `warning`, `error`, or `critical`. Avoid debug logging except while troubleshooting. |
 | `litellm_config` | Yes | Raw LiteLLM YAML merged only with the add-on-managed master key setting. |
 
-The default YAML configures `chatgpt/gpt-5.4`. Replace or extend it using the
-normal [LiteLLM config format](https://docs.litellm.ai/docs/proxy/configs).
+The default YAML configures `chatgpt/gpt-5.4` and
+`github_copilot/gpt-5.2`. Replace or extend it using the normal
+[LiteLLM config format](https://docs.litellm.ai/docs/proxy/configs).
 Provider credentials may use LiteLLM's `environment_variables` section. The
 option and generated `/data/litellm-config.yaml` must be treated as secrets;
 the generated file is mode `0600` and its contents are never logged.
@@ -79,7 +80,10 @@ entered directly. `general_settings.master_key` is always replaced with the
 add-on's protected `master_key` option. The add-on also reserves `HOME`,
 `XDG_CACHE_HOME`, `LITELLM_MASTER_KEY`, `LITELLM_SALT_KEY`, `LITELLM_LOG`,
 `LITELLM_MODE`, `CHATGPT_TOKEN_DIR`, `CHATGPT_AUTH_FILE`, and
-`CONFIG_FILE_PATH`; do not set them in `environment_variables`.
+`CONFIG_FILE_PATH`. The GitHub Copilot token directory and filenames are also
+managed by the add-on; do not set `GITHUB_COPILOT_TOKEN_DIR`,
+`GITHUB_COPILOT_ACCESS_TOKEN_FILE`, or `GITHUB_COPILOT_API_KEY_FILE` in
+`environment_variables`.
 
 ## Home Assistant LiteLLM Integration
 
@@ -146,8 +150,9 @@ before changing models.
 
 LiteLLM `v1.89.5`, pinned by this add-on, includes the `github_copilot/*`
 provider. It uses GitHub's OAuth device flow and requires a GitHub account with
-Copilot access. Add a chat-compatible Copilot model to `litellm_config`; for
-example, this configuration keeps the default ChatGPT model and adds Copilot:
+Copilot access. New installations include a chat-compatible Copilot model by
+default. Existing installations retain their saved `litellm_config`; add the
+second model below if it is not already present:
 
 ```yaml
 model_list:
@@ -161,7 +166,8 @@ model_list:
       model: github_copilot/gpt-5.2
 ```
 
-After saving the configuration and restarting the add-on:
+After saving the configuration and restarting the add-on, authentication works
+like OpenCode's device flow:
 
 1. Send a request to `github_copilot/gpt-5.2`, or select it from a Home
    Assistant conversation agent and send a message.
