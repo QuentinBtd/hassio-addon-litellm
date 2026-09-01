@@ -174,13 +174,15 @@ like OpenCode's device flow:
    device code.
 2. Open the URL, enter the code, and authorize LiteLLM.
 3. The add-on queries Copilot's account-specific `/models` endpoint and logs
-   the discovered chat-compatible models before starting LiteLLM.
+   the discovered models before starting LiteLLM.
 4. Reload the Home Assistant LiteLLM integration and select one of those
    discovered models.
 
 The wildcard is expanded by the add-on and is never sent to Copilot. The
 generated `/data/litellm-config.yaml` contains only models that GitHub marks as
-enabled, visible in the model picker, and compatible with chat completions.
+enabled and visible in the model picker. Models supporting Copilot Responses
+are marked with `model_info.mode: responses`, allowing LiteLLM to bridge Home
+Assistant's chat-completions calls to the Responses API.
 The previous add-on default `github_copilot/gpt-5.2` is migrated through the
 same discovery process because availability varies by account, plan, rollout,
 and organization policy.
@@ -198,8 +200,7 @@ GitHub Enterprise users can set `GITHUB_COPILOT_API_BASE`,
 `GITHUB_COPILOT_DEVICE_CODE_URL`, `GITHUB_COPILOT_ACCESS_TOKEN_URL`, and
 `GITHUB_COPILOT_API_KEY_URL` in the LiteLLM `environment_variables` section.
 See the [LiteLLM GitHub Copilot provider documentation](https://docs.litellm.ai/docs/providers/github_copilot)
-for endpoint details and other supported models. Models whose metadata mode is
-`responses` only are not suitable for Home Assistant's chat-completions client.
+for endpoint details and other supported models.
 
 ## Persistence And Backups
 

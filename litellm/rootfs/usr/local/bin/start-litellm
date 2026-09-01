@@ -176,26 +176,30 @@ def discover_github_copilot_models(config: dict) -> None:
         endpoints = model.get("supported_endpoints", [])
         policy = model.get("policy")
         policy_state = policy.get("state") if isinstance(policy, dict) else None
+        supports_responses = isinstance(endpoints, list) and any(
+            endpoint in {"/responses", "/v1/responses"} for endpoint in endpoints
+        )
+        supports_chat = isinstance(endpoints, list) and any(
+            endpoint in {"/chat/completions", "/v1/chat/completions"}
+            for endpoint in endpoints
+        )
         if (
             isinstance(model_id, str)
             and model.get("model_picker_enabled", False)
             and policy_state != "disabled"
-            and isinstance(endpoints, list)
-            and any(
-                endpoint in {"/chat/completions", "/v1/chat/completions"}
-                for endpoint in endpoints
-            )
+            and (supports_responses or supports_chat)
         ):
             full_model_name = f"{COPILOT_PROVIDER_PREFIX}{model_id}"
-            discovered.append(
-                {
-                    "model_name": full_model_name,
-                    "litellm_params": {"model": full_model_name},
-                }
-            )
+            deployment = {
+                "model_name": full_model_name,
+                "litellm_params": {"model": full_model_name},
+            }
+            if supports_responses:
+                deployment["model_info"] = {"mode": "responses"}
+            discovered.append(deployment)
 
     if not discovered:
-        fail("GitHub Copilot did not return any enabled chat-completions models")
+        fail("GitHub Copilot did not return any enabled compatible models")
 
     first_index = discovery_indexes[0]
     model_list[:] = [
