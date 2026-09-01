@@ -1,3 +1,9 @@
+## [1.2.2](https://github.com/QuentinBtd/hassio-addon-litellm/compare/v1.2.1...v1.2.2) (2026-09-01)
+
+### Bug Fixes
+
+* expose Copilot Responses models ([09e5e7b](https://github.com/QuentinBtd/hassio-addon-litellm/commit/09e5e7b222a98fdfd6d9a5fa4252c049994d9ad3))
+
 ## [1.2.1](https://github.com/QuentinBtd/hassio-addon-litellm/compare/v1.2.0...v1.2.1) (2026-09-01)
 
 ### Bug Fixes
