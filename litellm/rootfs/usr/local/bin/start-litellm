@@ -7,14 +7,23 @@ from pathlib import Path
 import sys
 import tempfile
 
+import httpx
 import yaml
 
 
 DATA_DIR = Path("/data")
 OPTIONS_PATH = DATA_DIR / "options.json"
 CONFIG_PATH = DATA_DIR / "litellm-config.yaml"
-CHATGPT_GRACE_PATH = DATA_DIR / ".chatgpt-startup-grace"
+OAUTH_GRACE_PATH = DATA_DIR / ".oauth-startup-grace"
 PORT = 4000
+COPILOT_PROVIDER_PREFIX = "github_copilot/"
+COPILOT_ENVIRONMENT_VARIABLES = {
+    "GITHUB_COPILOT_ACCESS_TOKEN_URL",
+    "GITHUB_COPILOT_API_BASE",
+    "GITHUB_COPILOT_API_KEY_URL",
+    "GITHUB_COPILOT_CLIENT_ID",
+    "GITHUB_COPILOT_DEVICE_CODE_URL",
+}
 RESERVED_ENVIRONMENT_VARIABLES = {
     "CHATGPT_AUTH_FILE",
     "CHATGPT_TOKEN_DIR",
@@ -75,6 +84,10 @@ def build_config(options: dict) -> dict:
         fail("environment_variables must be a YAML mapping")
     if RESERVED_ENVIRONMENT_VARIABLES.intersection(environment_variables):
         fail("environment_variables contains a setting managed by the add-on")
+    for name in COPILOT_ENVIRONMENT_VARIABLES.intersection(environment_variables):
+        value = environment_variables[name]
+        if isinstance(value, str):
+            os.environ[name] = value
 
     os.environ["LITELLM_MASTER_KEY"] = master_key
     log_level = options.get("log_level", "info")
@@ -89,6 +102,113 @@ def build_config(options: dict) -> dict:
         os.environ["LITELLM_SALT_KEY"] = salt_key
 
     return config
+
+
+def discover_github_copilot_models(config: dict) -> None:
+    model_list = config.get("model_list", [])
+    if not isinstance(model_list, list):
+        return
+
+    discovery_indexes = []
+    for index, deployment in enumerate(model_list):
+        if not isinstance(deployment, dict):
+            continue
+        params = deployment.get("litellm_params", {})
+        if not isinstance(params, dict):
+            continue
+        configured_model = str(params.get("model", ""))
+        if configured_model == "github_copilot/*" or (
+            configured_model == "github_copilot/gpt-5.2"
+            and deployment.get("model_name") == configured_model
+        ):
+            discovery_indexes.append(index)
+
+    if not discovery_indexes:
+        return
+
+    catalog_path = DATA_DIR / ".config" / "litellm" / "github_copilot" / "models.json"
+    try:
+        from litellm.llms.github_copilot.authenticator import Authenticator
+        from litellm.llms.github_copilot.common_utils import (
+            DEFAULT_GITHUB_COPILOT_API_BASE,
+        )
+
+        authenticator = Authenticator()
+        authenticator.get_api_key()
+        access_token = authenticator.get_access_token()
+        api_base = (
+            authenticator.get_api_base()
+            or os.getenv("GITHUB_COPILOT_API_BASE")
+            or DEFAULT_GITHUB_COPILOT_API_BASE
+        ).rstrip("/")
+        response = httpx.get(
+            f"{api_base}/models",
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "User-Agent": "LiteLLM Home Assistant Add-on",
+                "X-GitHub-Api-Version": "2026-06-01",
+            },
+            timeout=10,
+        )
+        response.raise_for_status()
+        catalog_response = response.json()
+        catalog = catalog_response.get("data", [])
+        catalog_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        catalog_path.write_text(json.dumps(catalog_response), encoding="utf-8")
+        catalog_path.chmod(0o600)
+    except Exception as error:
+        try:
+            catalog = json.loads(catalog_path.read_text(encoding="utf-8")).get(
+                "data", []
+            )
+        except (OSError, json.JSONDecodeError, AttributeError):
+            fail(f"cannot discover GitHub Copilot models: {error}")
+        print(
+            f"Warning: cannot refresh GitHub Copilot models; using cached catalog: {error}",
+            file=sys.stderr,
+        )
+
+    discovered = []
+    for model in catalog:
+        if not isinstance(model, dict):
+            continue
+        model_id = model.get("id")
+        endpoints = model.get("supported_endpoints", [])
+        policy = model.get("policy")
+        policy_state = policy.get("state") if isinstance(policy, dict) else None
+        if (
+            isinstance(model_id, str)
+            and model.get("model_picker_enabled", False)
+            and policy_state != "disabled"
+            and isinstance(endpoints, list)
+            and any(
+                endpoint in {"/chat/completions", "/v1/chat/completions"}
+                for endpoint in endpoints
+            )
+        ):
+            full_model_name = f"{COPILOT_PROVIDER_PREFIX}{model_id}"
+            discovered.append(
+                {
+                    "model_name": full_model_name,
+                    "litellm_params": {"model": full_model_name},
+                }
+            )
+
+    if not discovered:
+        fail("GitHub Copilot did not return any enabled chat-completions models")
+
+    first_index = discovery_indexes[0]
+    model_list[:] = [
+        deployment
+        for index, deployment in enumerate(model_list)
+        if index not in discovery_indexes
+    ]
+    for deployment in reversed(discovered):
+        model_list.insert(first_index, deployment)
+    print(
+        "Discovered GitHub Copilot models: "
+        + ", ".join(model["model_name"] for model in discovered)
+    )
 
 
 def write_config(config: dict) -> None:
@@ -114,27 +234,26 @@ def write_config(config: dict) -> None:
         raise
 
 
-def prepare_chatgpt_health_grace(config: dict) -> None:
+def prepare_oauth_health_grace(config: dict) -> None:
     model_list = config.get("model_list", [])
-    uses_chatgpt = any(
+    uses_oauth = any(
         isinstance(model, dict)
         and isinstance(model.get("litellm_params"), dict)
-        and str(model["litellm_params"].get("model", "")).startswith("chatgpt/")
+        and str(model["litellm_params"].get("model", "")).startswith(
+            ("chatgpt/", COPILOT_PROVIDER_PREFIX)
+        )
         for model in model_list
     ) if isinstance(model_list, list) else False
 
-    if uses_chatgpt:
-        CHATGPT_GRACE_PATH.touch(mode=0o600)
+    if uses_oauth:
+        OAUTH_GRACE_PATH.touch(mode=0o600)
     else:
-        CHATGPT_GRACE_PATH.unlink(missing_ok=True)
+        OAUTH_GRACE_PATH.unlink(missing_ok=True)
 
 
 def main() -> None:
     # LiteLLM creates OAuth token files after startup; keep them owner-only.
     os.umask(0o077)
-    config = build_config(load_options())
-    write_config(config)
-    prepare_chatgpt_health_grace(config)
     os.environ["CHATGPT_TOKEN_DIR"] = str(DATA_DIR / "chatgpt")
     os.environ["CHATGPT_AUTH_FILE"] = "auth.json"
     os.environ["GITHUB_COPILOT_TOKEN_DIR"] = str(
@@ -142,6 +261,10 @@ def main() -> None:
     )
     os.environ["GITHUB_COPILOT_ACCESS_TOKEN_FILE"] = "access-token"
     os.environ["GITHUB_COPILOT_API_KEY_FILE"] = "api-key.json"
+    config = build_config(load_options())
+    prepare_oauth_health_grace(config)
+    discover_github_copilot_models(config)
+    write_config(config)
     print(f"Starting LiteLLM on port {PORT}")
     arguments = [
         "litellm",

@@ -35,8 +35,8 @@ LiteLLM configuration.
 | `log_level` | Yes | `debug`, `info`, `warning`, `error`, or `critical`. Avoid debug logging except while troubleshooting. |
 | `litellm_config` | Yes | Raw LiteLLM YAML merged only with the add-on-managed master key setting. |
 
-The default YAML configures `chatgpt/gpt-5.4` and
-`github_copilot/gpt-5.2`. Replace or extend it using the normal
+The default YAML configures `chatgpt/gpt-5.4` and dynamic discovery through
+`github_copilot/*`. Replace or extend it using the normal
 [LiteLLM config format](https://docs.litellm.ai/docs/proxy/configs).
 Provider credentials may use LiteLLM's `environment_variables` section. The
 option and generated `/data/litellm-config.yaml` must be treated as secrets;
@@ -150,9 +150,10 @@ before changing models.
 
 LiteLLM `v1.89.5`, pinned by this add-on, includes the `github_copilot/*`
 provider. It uses GitHub's OAuth device flow and requires a GitHub account with
-Copilot access. New installations include a chat-compatible Copilot model by
-default. Existing installations retain their saved `litellm_config`; add the
-second model below if it is not already present:
+Copilot access. New installations discover the enabled models for the
+authenticated account instead of relying on LiteLLM's static model catalog.
+Existing installations retain their saved `litellm_config`; use the wildcard
+entry below to enable discovery:
 
 ```yaml
 model_list:
@@ -161,26 +162,37 @@ model_list:
       mode: responses
     litellm_params:
       model: chatgpt/gpt-5.4
-  - model_name: github_copilot/gpt-5.2
+  - model_name: github_copilot/*
     litellm_params:
-      model: github_copilot/gpt-5.2
+      model: github_copilot/*
 ```
 
 After saving the configuration and restarting the add-on, authentication works
 like OpenCode's device flow:
 
-1. Send a request to `github_copilot/gpt-5.2`, or select it from a Home
-   Assistant conversation agent and send a message.
-2. Watch the add-on log for the GitHub verification URL and device code.
-3. Open the URL, enter the code, and authorize LiteLLM promptly while the
-   original request is waiting.
-4. Retry the request if it timed out during enrollment.
+1. Start the add-on and watch its log for the GitHub verification URL and
+   device code.
+2. Open the URL, enter the code, and authorize LiteLLM.
+3. The add-on queries Copilot's account-specific `/models` endpoint and logs
+   the discovered chat-compatible models before starting LiteLLM.
+4. Reload the Home Assistant LiteLLM integration and select one of those
+   discovered models.
+
+The wildcard is expanded by the add-on and is never sent to Copilot. The
+generated `/data/litellm-config.yaml` contains only models that GitHub marks as
+enabled, visible in the model picker, and compatible with chat completions.
+The previous add-on default `github_copilot/gpt-5.2` is migrated through the
+same discovery process because availability varies by account, plan, rollout,
+and organization policy.
 
 LiteLLM stores the long-lived GitHub access token in
 `/data/.config/litellm/github_copilot/access-token` and its short-lived Copilot
 API key in `/data/.config/litellm/github_copilot/api-key.json`. Both survive
 restarts, upgrades, and Home Assistant backups. Treat them as secrets. LiteLLM
 refreshes the Copilot API key automatically from the persisted GitHub token.
+The add-on also caches the last successful account model catalog in
+`/data/.config/litellm/github_copilot/models.json` so a temporary GitHub outage
+does not prevent subsequent starts.
 
 GitHub Enterprise users can set `GITHUB_COPILOT_API_BASE`,
 `GITHUB_COPILOT_DEVICE_CODE_URL`, `GITHUB_COPILOT_ACCESS_TOKEN_URL`, and
@@ -246,6 +258,10 @@ the image succeeds.
 - **GitHub Copilot authorization repeats:** verify the log does not report a
   permissions error under `/data/.config/litellm/github_copilot`; confirm the
   GitHub account still has Copilot access.
+- **GitHub Copilot reports `model_not_supported`:** use `github_copilot/*` in
+  `litellm_config`, restart the add-on, and select one of the account-specific
+  models logged during startup. Do not infer availability from LiteLLM's static
+  model list.
 - **Health checks fail:** `/health/liveliness` does not call providers or spend
   tokens. Check startup errors rather than testing `/health`, which performs
   real model calls and can incur provider charges.

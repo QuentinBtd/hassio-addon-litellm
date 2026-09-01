@@ -7,7 +7,7 @@ from urllib.error import URLError
 from urllib.request import urlopen
 
 
-GRACE_PATH = Path("/data/.chatgpt-startup-grace")
+GRACE_PATH = Path("/data/.oauth-startup-grace")
 AUTH_WINDOW_SECONDS = 16 * 60
 
 
