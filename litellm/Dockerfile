@@ -1,6 +1,6 @@
 # renovate: datasource=docker depName=ghcr.io/berriai/litellm
 # v1.90.0+ breaks non-streaming chatgpt/* requests; see LiteLLM #34094/#34095.
-FROM ghcr.io/berriai/litellm:v1.89.5@sha256:c98bf54e313fcd113800e30e011128b1242899405522703a86bc5b5475a07439
+FROM ghcr.io/berriai/litellm:v1.105.1@sha256:b7b9e2c306343721802253d0dd9436b9634a2eb4e14da7c7cf06c5c7b7530802
 
 ARG BUILD_VERSION=dev
 
